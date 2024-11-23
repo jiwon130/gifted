@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인공지능 테스트</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #74ebd5, #9face6);
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #fff;
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            color: #fff;
+            background-color: #4a90e2;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #357ab8;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        #webcam-container {
+            margin-top: 20px;
+            border: 5px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        #message {
+            font-size: 1.3rem;
+            color: #2d2d2d;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>자세 교정 모델</h1>
+    <button type="button" onclick="init()">Start</button>
+    <div id="webcam-container"></div>
+    <div id="message">모델이 예측한 결과가 여기에 표시됩니다.</div>
+
+    <!-- 오디오 파일 -->
+    <audio id="positive-audio" src="bright-music.mp3" preload="auto"></audio>
+    <audio id="negative-audio" src="beep-sound.mp3" preload="auto"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script>
+        const URL = "https://teachablemachine.withgoogle.com/models/4D2bbKLmI/";
+
+        let model, webcam;
+
+        // Load audio elements
+        const positiveAudio = document.getElementById("positive-audio");
+        const negativeAudio = document.getElementById("negative-audio");
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+
+            const flip = true; // Flip the webcam
+            webcam = new tmImage.Webcam(300, 300, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+            // 오디오 미리 재생하여 브라우저 보안 정책 우회
+            positiveAudio.play().then(() => positiveAudio.pause());
+            negativeAudio.play().then(() => negativeAudio.pause());
+        }
+
+        async function loop() {
+            webcam.update(); // Update the webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let message = ""; // Displayed message
+
+            // Process predictions for classes
+            if (prediction[0].className === "1" && prediction[0].probability > 0.8) {
+                message = "바른 자세로 앉아있군요!";
+                playPositiveAudio();
+            } else if (prediction[1].className === "2" && prediction[1].probability > 0.8) {
+                message = "바르게 앉으세요! 좋지 않은 자세입니다.";
+                playNegativeAudio();
+            }
+
+            document.getElementById("message").innerText = message;
+        }
+
+        function playPositiveAudio() {
+            if (!positiveAudio.paused) positiveAudio.currentTime = 0;
+            positiveAudio.play().catch((error) => console.error("Positive audio play error:", error));
+            negativeAudio.pause();
+        }
+
+        function playNegativeAudio() {
+            if (!negativeAudio.paused) negativeAudio.currentTime = 0;
+            negativeAudio.play().catch((error) => console.error("Negative audio play error:", error));
+            positiveAudio.pause();
+        }
+    </script>
+</body>
+</html>
